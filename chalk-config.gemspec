@@ -16,7 +16,7 @@ Gem::Specification.new do |gem|
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.require_paths = ['lib']
-  gem.add_dependency 'configatron'
+  gem.add_dependency 'configatron', '>= 2.13.0'
   gem.add_dependency 'chalk-tools'
   gem.add_development_dependency 'rake'
   gem.add_development_dependency 'minitest'
