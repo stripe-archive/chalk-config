@@ -1,13 +1,20 @@
 require 'socket'
 require 'uri'
 Gem.configuration
-src = Gem.sources.first
-begin
-  Socket.gethostbyname(URI.parse(src).host)
-rescue SocketError => e
-  STDERR.puts "Unable to resolve gem source #{s}"
+if chalk_sources = ENV['CHALK_SOURCES']
+  sources = chalk_sources.split(',')
+else
+  sources = Gem.sources
 end
-source src
+sources.each do |src|
+  begin
+    Socket.gethostbyname(URI.parse(src).host)
+  rescue SocketError => e
+    Bundler.ui.error("Unable to resolve gem source #{src}")
+    raise e
+  else
+    source src
+  end
+end
 
-# Specify your gem's dependencies in chalk-config.gemspec
 gemspec

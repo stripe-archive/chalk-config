@@ -1,69 +1,17 @@
-require 'chalk-config/version'
 require 'yaml'
+require 'chalk-tools'
+require 'chalk-config/version'
 
-begin
-  require 'configatron/core'
-rescue LoadError
-  # Not using cool enough configatron
-  require 'configatron'
-else
-  Configatron.disable_monkey_patching = true
-  raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
-  def configatron
-    Configatron.instance
-  end
+require 'configatron/core'
+raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
+def configatron
+  Configatron.instance
 end
+configatron # Calls reset! on initial instantiation, so need dummy call
+Configatron.strict = true
+Configatron.disable_monkey_patching = true
 
 module Chalk::Config
-  # Initialize configatron by running StripeContext::Config.init.
-  #
-  # This will first load the config schema (from config_schema.yaml in
-  # the base of your repo). A sample schema is something like this:
-  #
-  #   # Which files to use to discover environment state
-  #   files:
-  #     environment: /path/to/environment/file
-  #     personality: /path/to/personality/file
-  #     deployed: /path/to/deployed/file
-  #
-  #   # Which environment variables to use to discover environment state
-  #   env:
-  #     testing: STRIPE_TESTING
-  #
-  #   # Where to load configuration from. Configuration under nested is
-  #   # nested in configatron, so in this case we'd load configatron.foo
-  #   # with the contents of foo/bar.yaml.
-  #   config:
-  #     file: config.yaml
-  #     nested:
-  #       foo: foo/bar.yaml
-  #
-  #   # Where to load site-specific configuration from. That's a convenient
-  #   # place to store secrets. You probably don't want to store it in your
-  #   # version control.
-  #   site:
-  #     file: [/path/to/site.yaml, alternative/site.yaml]
-  #     nested:
-  #       foo: foo/bar-site.yaml
-  #
-  # There are four environment keys which configtron tries to
-  # infer. This allows you to specify overrides (e.g. this setting
-  # should only be present in production). Overrides are specified as:
-  #
-  #   overrides:
-  #     personality:
-  #       production:
-  #         foo: 1234
-  #
-  # Environment keys are the following:
-  #    environment: qa|nil|ci -- The class of machine the code is on
-  #    personality: production|development -- Whether this is a dev machine or not
-  #    deployed: true|false -- Whether this is on a local machine or a server
-  #    testing: true|false -- Whether the tests are being run
-  #
-  # Config then goes through all specified config files and merges
-  # them into the global configatron object, mixing in any overrides
-  # as it goes.
   CONFIG_SCHEMA_FILE = 'config_schema.yaml'
   DEFAULT_CONFIG_FILE = 'config.yaml'
   DEFAULT_SITE_FILE = 'site.yaml'
@@ -91,10 +39,15 @@ module Chalk::Config
   # files, and then puts Configatron into strict mode so it will
   # raise on invalid keys.
   def self.init
-    init_schema
-    init_from_config_files
+    Configatron.strict = false
 
-    Configatron.strict = true if Configatron.respond_to?(:strict)
+    begin
+      init_schema
+      init_from_config_files
+    ensure
+      Configatron.strict = true
+    end
+
     @@initialized = true
   end
 
@@ -221,7 +174,7 @@ module Chalk::Config
   def self.locate(files)
     files = [files] unless files.kind_of?(Array)
     expanded = files.map do |path|
-      StripeContext::PathUtils.path(path)
+      Chalk::Tools::PathUtils.path(path)
     end
 
     file = expanded.detect {|file| File.exists?(file)}
