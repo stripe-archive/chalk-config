@@ -10,6 +10,10 @@ end
 configatron # Calls reset! on initial instantiation, so need dummy call
 Configatron.strict = true
 Configatron.disable_monkey_patching = true
+# Stop configatron from sadly spewing on configure_from_hash
+if defined?(Configatron::Store::SYCK_CONSTANT)
+  Configatron::Store.send(:remove_const, 'SYCK_CONSTANT')
+end
 
 module Chalk::Config
   CONFIG_SCHEMA_FILE = 'config_schema.yaml'
