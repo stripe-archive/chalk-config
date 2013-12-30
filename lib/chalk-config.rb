@@ -101,7 +101,7 @@ module Chalk::Config
       begin
         loaded = load_and_check(env_file)
       rescue StandardError => e
-        raise "Could not load #{environment_spec_file}: #{e} (#{e.class})"
+        raise "Could not load #{env_file}: #{e} (#{e.class})"
       end
       set_env_config(env_file, loaded)
     else
