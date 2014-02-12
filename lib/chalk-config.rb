@@ -24,9 +24,13 @@ end
 module Chalk::Config
   include Chalk::FrameworkBuilder::Configurable
 
-  # filename => hash
-  @cached_configs = {}
-  @updated_configs = {}
+  # Array (to preserve registration order) of
+  # { file: ..., config: ..., overrides: ..., options: ... }
+  @cached_configs = []
+  # This makes it so that we're unable to add the same file with different
+  # nesting for now, which may be the desired behavior (I'm not absolutely
+  # certain this is what we want, but it does make the diffing easier).
+  @updated_configs = Set.new
 
   # Possibly reconfigure if the environment changes.
   def self.environment=(name)
@@ -39,17 +43,23 @@ module Chalk::Config
     @environment
   end
 
+  # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
-    allow_configatron_changes do
-      config = self.load!(filepath)
-      @cached_configs[filepath] = {
-        config: config,
-        options: options
-      }
-
-      update_config
+    if @updated_configs.include?(filepath)
+      # Ick, we're raising strings...
+      raise "You've already registered #{filepath}."
     end
+
+    config = load!(filepath)
+
+    # Push to cached_configs to preserve order of registration.
+    @cached_configs.push(generate_cached_config(filepath, config, options))
+
+    update_config
   end
+
+
+  private
 
   def self.allow_configatron_changes(&blk)
     Configatron.strict = false
@@ -61,6 +71,15 @@ module Chalk::Config
     end
   end
 
+  def self.generate_cached_config(file, config, options)
+    return {
+      overrides: config.delete('overrides') || {},
+      config: config,
+      options: options,
+      file: file
+    }
+  end
+
   def self.load!(filepath)
     loaded = YAML.load_file(filepath)
     raise "Not a valid YAML file: #{filepath}" unless loaded.is_a?(Hash)
@@ -69,33 +88,37 @@ module Chalk::Config
 
   # Take a hash and mix it in to an existing configatron
   # object. Also mix in any environment-specific overrides.
-  def self.mixin_config(hash, nested)
+  def self.mixin_config(config, overrides, nested)
     if nested
       subconfigatron = configatron[nested]
     else
       subconfigatron = configatron
     end
 
-    overrides = hash.delete('overrides') || {}
-    subconfigatron.configure_from_hash(hash)
+    subconfigatron.configure_from_hash(config)
 
     if override = overrides[environment]
-      subconfigatron.configure_from_hash(override)
+      subconfigatron.configure_from_hash(overrides)
     end
   end
 
   def self.clear_config
-    @updated_configs = {}
-    configatron.reset!
+    @updated_configs = Set.new
+    allow_configatron_changes do
+      configatron.reset!
+    end
   end
 
   def self.update_config
-    @cached_configs.each do |filename, contents|
-      next if @updated_configs[filename]
+    allow_configatron_changes do
+      @cached_configs.each do |contents|
+        next if @updated_configs.include?(contents[:file])
 
-      mixin_config(contents[:config], contents[:options][:nested])
-      @updated_configs[filename] = true
+        mixin_config(contents[:config], contents[:overrides], contents[:options][:nested])
+        @updated_configs.add(contents[:file])
+      end
     end
+    nil
   end
 end
 
