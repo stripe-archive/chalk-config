@@ -8,42 +8,42 @@ A configuration layer over configatron.
 
 It's easy to create YAML configuration files:
 
-  # /top/secret/site.yaml
+    # /top/secret/site.yaml
 
-  password: hunter2
+    password: hunter2
 
-  database:
-    secret: 53CR37
+    database:
+      secret: 53CR37
 
-  logs: /secret/location
+    logs: /secret/location
 
-  # cookies.yaml
+    # cookies.yaml
 
-  ingredients: 'A lot of sugar and butter'
-  instructions: 'Mix and bake'
+    ingredients: 'A lot of sugar and butter'
+    instructions: 'Mix and bake'
 
 
 The properties specified will then be added to the global
 configatron object when you register the file:
 
-  > Chalk::Config.register('/top/secret/site.yaml')
-  > configatron.password
-  => "hunter2"
+    > Chalk::Config.register('/top/secret/site.yaml')
+    > configatron.password
+    => "hunter2"
 
 Nested properties also work as expected:
 
-  > configatron.database.secret
-  => "53CR37"
+    > configatron.database.secret
+    => "53CR37"
 
 You can also explicitly nest a config file:
 
-  > Chalk::Config.register('cookies.yaml', nested: 'cookies')
+    > Chalk::Config.register('cookies.yaml', nested: 'cookies')
 
-  > configatron.cookies.ingredients
-  => "A lot of sugar and butter"
+    > configatron.cookies.ingredients
+    => "A lot of sugar and butter"
 
-  > configatron.ingredients
-  =>
+    > configatron.ingredients
+    =>
 
 
 ### Setting overrides for different environments
