@@ -1,6 +1,7 @@
 require 'yaml'
 require 'chalk-tools'
 require 'chalk-config/version'
+require 'chalk-framework-builder'
 
 require 'configatron/core'
 raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
@@ -15,7 +16,90 @@ if defined?(Configatron::Store::SYCK_CONSTANT)
   Configatron::Store.send(:remove_const, 'SYCK_CONSTANT')
 end
 
+# When a file is registered, we load the file and cache that.
+# Separately maintain the merged version.
+# When environment changes, we use the cached file.
+
+
 module Chalk::Config
+  include Chalk::FrameworkBuilder::Configurable
+
+  # filename => hash
+  @cached_configs = {}
+  @updated_configs = {}
+
+  # Possibly reconfigure if the environment changes.
+  def self.environment=(name)
+    @environment = name
+    clear_config
+    update_config
+  end
+
+  def self.environment
+    @environment
+  end
+
+  def self.register(filepath, options={})
+    allow_configatron_changes do
+      config = self.load!(filepath)
+      @cached_configs[filepath] = {
+        config: config,
+        options: options
+      }
+
+      update_config
+    end
+  end
+
+  def self.allow_configatron_changes(&blk)
+    Configatron.strict = false
+
+    begin
+      blk.call
+    ensure
+      Configatron.strict = true
+    end
+  end
+
+  def self.load!(filepath)
+    loaded = YAML.load_file(filepath)
+    raise "Not a valid YAML file: #{filepath}" unless loaded.is_a?(Hash)
+    loaded
+  end
+
+  # Take a hash and mix it in to an existing configatron
+  # object. Also mix in any environment-specific overrides.
+  def self.mixin_config(hash, nested)
+    if nested
+      subconfigatron = configatron[nested]
+    else
+      subconfigatron = configatron
+    end
+
+    overrides = hash.delete('overrides') || {}
+    subconfigatron.configure_from_hash(hash)
+
+    if override = overrides[environment]
+      subconfigatron.configure_from_hash(override)
+    end
+  end
+
+  def self.clear_config
+    @updated_configs = {}
+    configatron.reset!
+  end
+
+  def self.update_config
+    @cached_configs.each do |filename, contents|
+      next if @updated_configs[filename]
+
+      mixin_config(contents[:config], contents[:options][:nested])
+      @updated_configs[filename] = true
+    end
+  end
+end
+
+__END__
   CONFIG_SCHEMA_FILE = 'config_schema.yaml'
   DEFAULT_CONFIG_FILE = 'config.yaml'
   DEFAULT_SITE_FILE = 'site.yaml'
@@ -23,13 +107,12 @@ module Chalk::Config
   DEFAULT_ENV_FILE = 'env.yaml'
   ENV_SETTINGS = {
     # Defaults
+    'name' => 'local', # An alias for the current environment.
     'environment' => nil, # what server class this is on
     'personality' => 'development', # production or development
     'deployed' => false, # server, or on a local machine
     'testing' => false # in the tests
   }
-
-  @@initialized = false
 
   def self.production?
     configatron.env.personality == 'production'
@@ -39,80 +122,10 @@ module Chalk::Config
     configatron.env.personality == 'development'
   end
 
-  # Run this at load time. Discovers the environment, loads config
-  # files, and then puts Configatron into strict mode so it will
-  # raise on invalid keys.
-  def self.init
-    Configatron.strict = false
-
-    begin
-      init_schema
-      init_from_config_files
-    ensure
-      Configatron.strict = true
-    end
-
-    @@initialized = true
-  end
-
-  def self.initialized?
-    @@initialized
-  end
-
-  private
-
-  def self.init_from_config_files
-    config = configatron._meta.schema.config
-    config_file = config.retrieve(:file, DEFAULT_CONFIG_FILE)
-    nested_config_files = config.nested.to_hash
-
-    site = configatron._meta.schema.site
-    site_file = site.retrieve(:file, DEFAULT_SITE_FILE)
-    nested_site_files = site.nested.to_hash
-
-    files_to_load =
-      [[nil, config_file]] +
-      nested_config_files.to_a +
-      [[nil, site_file]] +
-      nested_site_files.to_a
-
-    files_to_load.each do |key, file|
-      subconfigatron = key ? configatron.send(key) : configatron
-      locate_and_load(file, subconfigatron)
-    end
-  end
-
-  # Load the schema, which is used to tell Config how to discover
-  # its environment, and what config files to load. You shouldn't
-  # have to care, but the schema is stored at
-  # configatron._meta.schema.
-  #
-  # You can access environment values at configatron.env.<key>.
-  def self.init_schema
-    locate_and_load(CONFIG_SCHEMA_FILE, configatron._meta.schema) do
-      load_env
-    end
-  end
-
-  def self.load_env
-    env_file = configatron._meta.schema.files.retrieve(:env_file, DEFAULT_ENV_FILE)
-
-    if File.exists?(env_file)
-      begin
-        loaded = load_and_check(env_file)
-      rescue StandardError => e
-        raise "Could not load #{env_file}: #{e} (#{e.class})"
-      end
-      set_env_config(env_file, loaded)
-    else
-      set_env_defaults
-    end
-
-    set_env_from_environment_variables
-  end
-
   def self.set_env_config(env_file, loaded)
     ENV_SETTINGS.keys.each do |key|
+      # Currently we require all env settings keys to be present; this doesn't
+      # need to be the case in the near future.
       unless loaded.include?(key)
         raise "Missing key #{key} from settings loaded from #{env_file}"
       end
@@ -126,18 +139,6 @@ module Chalk::Config
     end
   end
 
-  def self.set_env_from_environment_variables
-    configatron._meta.schema.env.to_hash.each do |key, variable|
-      key = key.to_s
-      raise "Invalid env key #{key.inspect} in #{configatron._meta.schema.env.inspect}" unless ENV_SETTINGS.include?(key)
-      configatron.env[key] = ENV[variable] if ENV.include?(variable)
-    end
-  end
-
-  def self.locate_and_load(files, subconfigatron=nil, &blk)
-    file = locate(files)
-    load_config(file, subconfigatron, &blk) if file
-  end
 
   def self.load_config(file, subconfigatron=nil, &blk)
     begin
