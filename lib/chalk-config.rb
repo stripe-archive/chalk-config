@@ -26,11 +26,11 @@ module Chalk::Config
 
   # Array (to preserve registration order) of
   # { file: ..., config: ..., overrides: ..., options: ... }
-  @cached_configs = []
+  @config_cache = []
   # This makes it so that we're unable to add the same file with different
   # nesting for now, which may be the desired behavior (I'm not absolutely
   # certain this is what we want, but it does make the diffing easier).
-  @updated_configs = Set.new
+  @applied_configs = Set.new
 
   # Possibly reconfigure if the environment changes.
   def self.environment=(name)
@@ -45,17 +45,18 @@ module Chalk::Config
 
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
-    if @updated_configs.include?(filepath)
+    if @applied_configs.include?(filepath)
       # Ick, we're raising strings...
       raise "You've already registered #{filepath}."
     end
 
-    config = load!(filepath)
+    config = load!(filepath, options)
 
-    # Push to cached_configs to preserve order of registration.
-    @cached_configs.push(generate_cached_config(filepath, config, options))
-
-    update_config
+    if config
+      # Push to config_cache to preserve order of registration.
+      @config_cache << generate_cached_config(filepath, config, options)
+      update_config
+    end
   end
 
 
@@ -80,8 +81,13 @@ module Chalk::Config
     }
   end
 
-  def self.load!(filepath)
-    loaded = YAML.load_file(filepath)
+  def self.load!(filepath, options)
+    begin
+      loaded = YAML.load_file(filepath)
+    rescue Errno::ENOENT
+      return nil if options[:optional]
+      raise
+    end
     raise "Not a valid YAML file: #{filepath}" unless loaded.is_a?(Hash)
     loaded
   end
@@ -103,7 +109,7 @@ module Chalk::Config
   end
 
   def self.clear_config
-    @updated_configs = Set.new
+    @applied_configs = Set.new
     allow_configatron_changes do
       configatron.reset!
     end
@@ -111,11 +117,11 @@ module Chalk::Config
 
   def self.update_config
     allow_configatron_changes do
-      @cached_configs.each do |contents|
-        next if @updated_configs.include?(contents[:file])
+      @config_cache.each do |contents|
+        next if @applied_configs.include?(contents[:file])
 
         mixin_config(contents[:config], contents[:overrides], contents[:options][:nested])
-        @updated_configs.add(contents[:file])
+        @applied_configs.add(contents[:file])
       end
     end
     nil
