@@ -24,19 +24,14 @@ end
 module Chalk::Config
   include Chalk::FrameworkBuilder::Configurable
 
-  # Array (to preserve registration order) of
-  # { file: ..., config: ..., overrides: ..., options: ... }
-  @config_cache = []
-  # This makes it so that we're unable to add the same file with different
-  # nesting for now, which may be the desired behavior (I'm not absolutely
-  # certain this is what we want, but it does make the diffing easier).
-  @applied_configs = Set.new
+  # Hash (relies on registration order being preserved) of
+  # file => {config: ..., overrides: ..., options: ... }
+  @registrations = {}
 
   # Possibly reconfigure if the environment changes.
   def self.environment=(name)
     @environment = name
-    clear_config
-    update_config
+    reapply_config
   end
 
   def self.environment
@@ -45,22 +40,40 @@ module Chalk::Config
 
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
-    if @applied_configs.include?(filepath)
-      # Ick, we're raising strings...
+    if @registrations.include?(filepath)
       raise "You've already registered #{filepath}."
     end
 
-    config = load!(filepath, options)
-
-    if config
-      # Push to config_cache to preserve order of registration.
-      @config_cache << generate_cached_config(filepath, config, options)
-      update_config
+    begin
+      config = load!(filepath)
+    rescue Errno::ENOENT
+      raise unless options[:optional]
+      config = {}
     end
+
+    overrides = extract_overrides!(config)
+    directive = {
+      overrides: overrides,
+      config: config,
+      options: options,
+    }
+
+    @registrations[filepath] = directive
+    apply_directive(directive)
   end
 
-
   private
+
+  def self.extract_overrides!(config)
+    overrides = config.fetch('overrides', {})
+    # Make sure the user didn't specify a nonsensical override
+    unless overrides.kind_of?(Hash)
+      raise "Invalid overrides hash specified in #{filepath}: #{overrides.inspect}"
+    end
+    config.delete('overrides')
+
+    overrides
+  end
 
   def self.allow_configatron_changes(&blk)
     Configatron.strict = false
@@ -72,24 +85,18 @@ module Chalk::Config
     end
   end
 
-  def self.generate_cached_config(file, config, options)
-    return {
-      overrides: config.delete('overrides') || {},
-      config: config,
-      options: options,
-      file: file
-    }
+  def self.load!(filepath)
+    loaded = YAML.load_file(filepath)
+    unless loaded.is_a?(Hash)
+      raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
+    end
+    loaded
   end
 
-  def self.load!(filepath, options)
-    begin
-      loaded = YAML.load_file(filepath)
-    rescue Errno::ENOENT
-      return nil if options[:optional]
-      raise
-    end
-    raise "Not a valid YAML file: #{filepath}" unless loaded.is_a?(Hash)
-    loaded
+  def self.apply_directive(directive)
+    mixin_config(
+      directive[:config], directive[:overrides], directive[:options][:nested]
+      )
   end
 
   # Take a hash and mix it in to an existing configatron
@@ -108,22 +115,12 @@ module Chalk::Config
     end
   end
 
-  def self.clear_config
-    @applied_configs = Set.new
+  def self.reapply_config
     allow_configatron_changes do
       configatron.reset!
-    end
-  end
-
-  def self.update_config
-    allow_configatron_changes do
-      @config_cache.each do |contents|
-        next if @applied_configs.include?(contents[:file])
-
-        mixin_config(contents[:config], contents[:overrides], contents[:options][:nested])
-        @applied_configs.add(contents[:file])
+      @registrations.each do |_, registration|
+        apply_directive(registration)
       end
     end
-    nil
   end
 end
