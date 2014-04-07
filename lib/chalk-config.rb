@@ -25,8 +25,9 @@ module Chalk::Config
   include Chalk::FrameworkBuilder::Configurable
 
   # Hash (relies on registration order being preserved) of
-  # file => {config: ..., overrides: ..., options: ... }
+  # file => {config: ..., overrides: ..., options: ..., tags: ...}
   @registrations = {}
+  @tags = Set.new
 
   # Possibly reconfigure if the environment changes.
   def self.environment=(name)
@@ -51,9 +52,10 @@ module Chalk::Config
       config = {}
     end
 
-    overrides = extract_overrides!(config)
+    overrides, tags = extract_overrides!(config)
     directive = {
       overrides: overrides,
+      tags: tags,
       config: config,
       options: options,
     }
@@ -62,17 +64,31 @@ module Chalk::Config
     apply_directive(directive)
   end
 
+  def self.add_tag(tag)
+    @tags << tag
+    reapply_config
+  end
+
+  def self.tag?(tag)
+    @tags.include?(tag)
+  end
+
   private
 
   def self.extract_overrides!(config)
-    overrides = config.fetch('overrides', {})
+    overrides = config.fetch('__overrides', {})
+    tags = overrides.fetch('__tags', {})
     # Make sure the user didn't specify a nonsensical override
     unless overrides.kind_of?(Hash)
       raise "Invalid overrides hash specified in #{filepath}: #{overrides.inspect}"
     end
-    config.delete('overrides')
+    unless tags.kind_of?(Hash)
+      raise "Invalid tags hash specified in #{filepath}: #{tags.inspect}"
+    end
+    config.delete('__overrides')
+    overrides.delete('__tags')
 
-    overrides
+    [overrides, tags]
   end
 
   def self.allow_configatron_changes(&blk)
@@ -95,13 +111,13 @@ module Chalk::Config
 
   def self.apply_directive(directive)
     mixin_config(
-      directive[:config], directive[:overrides], directive[:options][:nested]
-      )
+      directive[:config], directive[:overrides], directive[:tags], directive[:options][:nested]
+    )
   end
 
   # Take a hash and mix it in to an existing configatron
   # object. Also mix in any environment-specific overrides.
-  def self.mixin_config(config, overrides, nested)
+  def self.mixin_config(config, overrides, tags, nested)
     if nested
       subconfigatron = configatron[nested]
     else
@@ -111,7 +127,13 @@ module Chalk::Config
     subconfigatron.configure_from_hash(config)
 
     if override = overrides[environment]
-      subconfigatron.configure_from_hash(overrides)
+      subconfigatron.configure_from_hash(override)
+    end
+
+    tags.each do |tag, override|
+      if tag?(tag)
+        subconfigatron.configure_from_hash(override)
+      end
     end
   end
 
