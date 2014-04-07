@@ -54,7 +54,7 @@ You can set overrides for configured properties based on environment name:
 
     year: 1984
 
-    overrides:
+    __overrides:
       production:
         year: 2014
 
