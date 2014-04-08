@@ -69,7 +69,9 @@ module Chalk::Config
     }
 
     @registrations[filepath] = directive
-    apply_directive(directive)
+    allow_configatron_changes do
+      apply_directive(directive)
+    end
   end
 
   def self.add_tag(tag)
