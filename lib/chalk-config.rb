@@ -20,7 +20,6 @@ end
 # Separately maintain the merged version.
 # When environment changes, we use the cached file.
 
-
 module Chalk::Config
   include Chalk::FrameworkBuilder::Configurable
 
@@ -28,6 +27,7 @@ module Chalk::Config
   # file => {config: ..., overrides: ..., options: ..., tags: ...}
   @registrations = {}
   @tags = Set.new
+  @metadata = {}
 
   # Possibly reconfigure if the environment changes.
   def self.environment=(name)
@@ -37,6 +37,14 @@ module Chalk::Config
 
   def self.environment
     @environment
+  end
+
+  def self.set_metadata(key, value)
+    @metadata[key] = value
+  end
+
+  def self.get_metadata(key)
+    @metadata[key]
   end
 
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
