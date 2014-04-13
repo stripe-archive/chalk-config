@@ -1,3 +1,4 @@
+require 'set'
 require 'yaml'
 require 'chalk-tools'
 require 'chalk-config/version'
@@ -20,88 +21,90 @@ end
 # Separately maintain the merged version.
 # When environment changes, we use the cached file.
 
-module Chalk::Config
-  include Chalk::FrameworkBuilder::Configurable
+class Chalk::Config
+  include Singleton
 
-  # Hash (relies on registration order being preserved) of
-  # file => {config: ..., overrides: ..., options: ..., tags: ...}
-  @registrations = {}
-  @tags = Set.new
-  @metadata = {}
+  class MissingEnvironment < StandardError; end
 
-  # Possibly reconfigure if the environment changes.
+  ## Class methods here serve as the public-interface
+
   def self.environment=(name)
-    @environment = name
-    reapply_config
+    instance.environment = name
   end
 
   def self.environment
-    @environment
-  end
-
-  def self.set_metadata(key, value)
-    @metadata[key] = value
-  end
-
-  def self.get_metadata(key)
-    @metadata[key]
+    instance.environment
   end
 
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
-    if @registrations.include?(filepath)
+    instance.register(filepath, options)
+  end
+
+  def self.set_runtime_config(config)
+    instance.set_runtime_config(config)
+  end
+
+  def initialize
+    # List of registered configs, in the form:
+    #
+    # file => {config: ..., options: ...}
+    @registrations = []
+    @registered_files = Set.new
+    @environment = 'default'
+  end
+
+  ## The actual instance implementations
+
+  # Possibly reconfigure if the environment changes.
+  def environment=(name)
+    @environment = name
+    reapply_config
+  end
+
+  def environment
+    @environment
+  end
+
+  def set_runtime_config(config)
+    register_raw(config, nil, {})
+  end
+
+  def register(filepath, options)
+    if @registered_files.include?(filepath)
       raise "You've already registered #{filepath}."
     end
+    @registered_files << filepath
 
     begin
       config = load!(filepath)
     rescue Errno::ENOENT
-      raise unless options[:optional]
-      config = {}
+      return if options[:optional]
+      raise
     end
 
-    overrides, tags = extract_overrides!(config)
-    directive = {
-      overrides: overrides,
-      tags: tags,
-      config: config,
-      options: options,
-    }
-
-    @registrations[filepath] = directive
-    allow_configatron_changes do
-      apply_directive(directive)
-    end
-  end
-
-  def self.add_tag(tag)
-    @tags << tag
-    reapply_config
-  end
-
-  def self.tag?(tag)
-    @tags.include?(tag)
+    register_raw(config, filepath, options)
   end
 
   private
 
-  def self.extract_overrides!(config)
-    overrides = config.fetch('__overrides', {})
-    tags = overrides.fetch('__tags', {})
-    # Make sure the user didn't specify a nonsensical override
-    unless overrides.kind_of?(Hash)
-      raise "Invalid overrides hash specified in #{filepath}: #{overrides.inspect}"
-    end
-    unless tags.kind_of?(Hash)
-      raise "Invalid tags hash specified in #{filepath}: #{tags.inspect}"
-    end
-    config.delete('__overrides')
-    overrides.delete('__tags')
+  # Register some raw config
+  def register_raw(config, filepath, options)
+    allow_configatron_changes do
+      directive = {
+        config: config,
+        filepath: filepath,
+        options: options,
+      }
 
-    [overrides, tags]
+      @registrations << directive
+      allow_configatron_changes do
+        mixin_config(directive)
+      end
+    end
   end
 
-  def self.allow_configatron_changes(&blk)
+  def allow_configatron_changes(&blk)
     Configatron.strict = false
 
     begin
@@ -111,7 +114,7 @@ module Chalk::Config
     end
   end
 
-  def self.load!(filepath)
+  def load!(filepath)
     loaded = YAML.load_file(filepath)
     unless loaded.is_a?(Hash)
       raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
@@ -119,39 +122,29 @@ module Chalk::Config
     loaded
   end
 
-  def self.apply_directive(directive)
-    mixin_config(
-      directive[:config], directive[:overrides], directive[:tags], directive[:options][:nested]
-    )
-  end
+  # Take a hash and mix in the environment-appropriate key to an
+  # existing configatron object.
+  def mixin_config(directive)
+    config = directive[:config]
+    if directive[:filepath] && !config.include?(environment)
+      raise MissingEnvironment.new("No environment #{environment.inspect} defined for config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+    end
+    choice = config.fetch(environment)
 
-  # Take a hash and mix it in to an existing configatron
-  # object. Also mix in any environment-specific overrides.
-  def self.mixin_config(config, overrides, tags, nested)
-    if nested
+    if nested = directive[:options][:nested]
       subconfigatron = configatron[nested]
     else
       subconfigatron = configatron
     end
 
-    subconfigatron.configure_from_hash(config)
-
-    if override = overrides[environment]
-      subconfigatron.configure_from_hash(override)
-    end
-
-    tags.each do |tag, override|
-      if tag?(tag)
-        subconfigatron.configure_from_hash(override)
-      end
-    end
+    subconfigatron.configure_from_hash(choice)
   end
 
-  def self.reapply_config
+  def reapply_config
     allow_configatron_changes do
       configatron.reset!
       @registrations.each do |_, registration|
-        apply_directive(registration)
+        mixin_config(registration)
       end
     end
   end

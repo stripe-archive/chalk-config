@@ -1,5 +1,6 @@
+
 module Chalk
-  module Config
+  class Config
     VERSION = "0.0.2"
   end
 end
