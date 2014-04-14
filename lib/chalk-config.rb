@@ -66,8 +66,9 @@ class Chalk::Config
     @environment
   end
 
+  # Set configatron.runtime_config key
   def set_runtime_config(config)
-    register_raw(config, nil, {})
+    register_raw(config, nil, nested: 'runtime_config')
   end
 
   def register(filepath, options)
