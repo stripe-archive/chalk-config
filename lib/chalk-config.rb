@@ -98,7 +98,8 @@ class Chalk::Config
     begin
       config = load!(filepath)
     rescue Errno::ENOENT
-      raise unless options[:optional]
+      return if options[:optional]
+      raise
     end
 
     register_raw(config, filepath, options)

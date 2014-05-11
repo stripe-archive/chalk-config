@@ -41,13 +41,12 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
   end
 
   describe 'missing nested files' do
-    it 'still creates the relevant config key' do
+    it 'does not create the relevant config key' do
       Chalk::Config.register(File.expand_path('../general/nonexistent.yaml', __FILE__),
         optional: true,
         nested: 'nonexistent')
-      configatron.nonexistent
       assert_raises(KeyError) do
-        configatron.nonexistent.error
+        configatron.nonexistent
       end
     end
 
