@@ -150,7 +150,7 @@ class Chalk::Config
   def mixin_config(directive)
     config = directive[:config]
     if directive[:filepath] && !config.include?(environment)
-      raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+      raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
     end
     choice = config.fetch(environment)
 
@@ -165,8 +165,8 @@ class Chalk::Config
 
   def validate_config(directive)
     (@required_environments || []).each do |environment|
-      unless directive.include?(environment)
-        raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+      unless directive[:config].include?(environment)
+        raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
       end
     end
   end
