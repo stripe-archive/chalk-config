@@ -1,8 +1,6 @@
 require 'set'
 require 'yaml'
-require 'chalk-tools'
 require 'chalk-config/version'
-require 'chalk-framework-builder'
 
 require 'configatron/core'
 raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
@@ -49,8 +47,8 @@ class Chalk::Config
     instance.register(filepath, options)
   end
 
-  def self.set_runtime_config(config)
-    instance.set_runtime_config(config)
+  def self.runtime_config=(config)
+    instance.runtime_config = config
   end
 
   def initialize
@@ -87,7 +85,7 @@ class Chalk::Config
   end
 
   # Set configatron.runtime_config key
-  def set_runtime_config(config)
+  def runtime_config=(config)
     register_raw(config, nil, nested: 'runtime_config')
   end
 
@@ -149,10 +147,24 @@ class Chalk::Config
   # existing configatron object.
   def mixin_config(directive)
     config = directive[:config]
-    if directive[:filepath] && !config.include?(environment)
-      raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+    filepath = directive[:filepath]
+
+    if filepath && config && !config.include?(environment)
+      # Directive is derived from a file (i.e. not runtime_config) and
+      # that file existed, but is missing the environment.
+      raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
     end
-    choice = config.fetch(environment)
+
+    if filepath && config
+      # Derived from file, and file present
+      choice = config.fetch(environment)
+    elsif filepath
+      # Derived from file, but file missing
+      choice = {}
+    else
+      # Manually specified runtime_config
+      choice = config
+    end
 
     if nested = directive[:options][:nested]
       subconfigatron = configatron[nested]
@@ -165,8 +177,11 @@ class Chalk::Config
 
   def validate_config(directive)
     (@required_environments || []).each do |environment|
-      unless directive.include?(environment)
-        raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+      config = directive[:config]
+      filepath = directive[:filepath]
+
+      if filepath && config && !config.include?(environment)
+        raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
       end
     end
   end
