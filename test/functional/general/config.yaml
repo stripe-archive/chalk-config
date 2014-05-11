@@ -1,0 +1,7 @@
+default: &default
+  config1: value1
+  config2: value2
+
+testing:
+  <<: *default
+  config2: value3
