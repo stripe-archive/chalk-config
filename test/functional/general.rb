@@ -28,6 +28,37 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     assert_equal('value2', configatron.config2)
   end
 
+  describe 'runtime_config' do
+    it 'translates provided config to a runtime_config' do
+      Chalk::Config.runtime_config = {foo: 'bar'}
+      assert_equal('bar', configatron.runtime_config.foo)
+    end
+
+    it 'environment validation continues to succeed' do
+      Chalk::Config.runtime_config = {foo: 'bar'}
+      Chalk::Config.required_environments = ['default']
+    end
+  end
+
+  describe 'missing nested files' do
+    it 'still creates the relevant config key' do
+      Chalk::Config.register(File.expand_path('../general/nonexistent.yaml', __FILE__),
+        optional: true,
+        nested: 'nonexistent')
+      configatron.nonexistent
+      assert_raises(KeyError) do
+        configatron.nonexistent.error
+      end
+    end
+
+    it 'environment validation continues to succeed' do
+      Chalk::Config.register(File.expand_path('../general/nonexistent.yaml', __FILE__),
+        optional: true,
+        nested: 'nonexistent')
+      Chalk::Config.required_environments = ['default']
+    end
+  end
+
   describe 'required_environments' do
     it 'raises if an existing config is missing an environment' do
       assert_raises(Chalk::Config::MissingEnvironment) do
