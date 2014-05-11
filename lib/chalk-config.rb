@@ -144,7 +144,7 @@ class Chalk::Config
   def reapply_config
     allow_configatron_changes do
       configatron.reset!
-      @registrations.each do |_, registration|
+      @registrations.each do |registration|
         mixin_config(registration)
       end
     end
