@@ -36,6 +36,14 @@ class Chalk::Config
     instance.environment
   end
 
+  def self.required_environments=(environments)
+    instance.required_environments = environments
+  end
+
+  def self.required_environments
+    instance.required_environments
+  end
+
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
     instance.register(filepath, options)
@@ -64,6 +72,18 @@ class Chalk::Config
 
   def environment
     @environment
+  end
+
+  def required_environments=(environments)
+    @required_environments = environments
+    @registrations.each do |registration|
+      # Validate all existing config
+      validate_config(registration)
+    end
+  end
+
+  def required_environments
+    @required_environments
   end
 
   # Set configatron.runtime_config key
@@ -98,7 +118,9 @@ class Chalk::Config
         options: options,
       }
 
+      validate_config(directive)
       @registrations << directive
+
       allow_configatron_changes do
         mixin_config(directive)
       end
@@ -128,7 +150,7 @@ class Chalk::Config
   def mixin_config(directive)
     config = directive[:config]
     if directive[:filepath] && !config.include?(environment)
-      raise MissingEnvironment.new("No environment #{environment.inspect} defined for config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+      raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
     end
     choice = config.fetch(environment)
 
@@ -139,6 +161,14 @@ class Chalk::Config
     end
 
     subconfigatron.configure_from_hash(choice)
+  end
+
+  def validate_config(directive)
+    (@required_environments || []).each do |environment|
+      unless directive.include?(environment)
+        raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config from #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
+      end
+    end
   end
 
   def reapply_config
