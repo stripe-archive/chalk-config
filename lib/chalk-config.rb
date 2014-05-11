@@ -1,8 +1,6 @@
 require 'set'
 require 'yaml'
-require 'chalk-tools'
 require 'chalk-config/version'
-require 'chalk-framework-builder'
 
 require 'configatron/core'
 raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
