@@ -40,6 +40,16 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     end
   end
 
+  describe 'without_environments files' do
+    it 'merges the file contents directly' do
+      Chalk::Config.register(File.expand_path('../general/without_environments.yaml', __FILE__),
+        without_environments: true)
+      assert_equal('there', configatron.hi)
+      assert_equal('bat', configatron.baz)
+      assert_equal('no_environment', configatron.config1)
+    end
+  end
+
   describe 'missing nested files' do
     it 'does not create the relevant config key' do
       Chalk::Config.register(File.expand_path('../general/nonexistent.yaml', __FILE__),

@@ -146,16 +146,21 @@ class Chalk::Config
   # Take a hash and mix in the environment-appropriate key to an
   # existing configatron object.
   def mixin_config(directive)
+    without_environments = directive[:options][:without_environments]
+
     config = directive[:config]
     filepath = directive[:filepath]
 
-    if filepath && config && !config.include?(environment)
-      # Directive is derived from a file (i.e. not runtime_config) and
-      # that file existed, but is missing the environment.
+    if !without_environments && filepath && config && !config.include?(environment)
+      # Directive is derived from a file (i.e. not runtime_config)
+      # with environments and that file existed, but is missing the
+      # environment.
       raise MissingEnvironment.new("Current environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")
     end
 
-    if filepath && config
+    if without_environments
+      choice = config
+    elsif filepath && config
       # Derived from file, and file present
       choice = config.fetch(environment)
     elsif filepath
