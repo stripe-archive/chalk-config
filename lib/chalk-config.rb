@@ -182,8 +182,12 @@ class Chalk::Config
 
   def validate_config(directive)
     (@required_environments || []).each do |environment|
+      without_environments = directive[:options][:without_environments]
+
       config = directive[:config]
       filepath = directive[:filepath]
+
+      next if without_environments
 
       if filepath && config && !config.include?(environment)
         raise MissingEnvironment.new("Required environment #{environment.inspect} not defined in config file #{directive[:filepath].inspect}. (HINT: you should have a YAML key of #{environment.inspect}. You may want to inherit a default via YAML's `<<` operator.)")

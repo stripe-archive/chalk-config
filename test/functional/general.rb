@@ -48,6 +48,12 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
       assert_equal('bat', configatron.baz)
       assert_equal('no_environment', configatron.config1)
     end
+
+    it 'does not try to validate presence of environments' do
+      Chalk::Config.required_environments = ['default']
+      Chalk::Config.register(File.expand_path('../general/without_environments.yaml', __FILE__),
+        without_environments: true)
+    end
   end
 
   describe 'missing nested files' do
