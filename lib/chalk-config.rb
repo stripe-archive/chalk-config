@@ -47,8 +47,8 @@ class Chalk::Config
     instance.register(filepath, options)
   end
 
-  def self.runtime_config=(config)
-    instance.runtime_config = config
+  def self.register_raw(config)
+    instance.register_raw(config)
   end
 
   def initialize
@@ -84,12 +84,11 @@ class Chalk::Config
     @required_environments
   end
 
-  # Set configatron.runtime_config key
-  def runtime_config=(config)
-    register_raw(config, nil, nested: 'runtime_config')
-  end
-
   def register(filepath, options)
+    # Expand relative paths. This is for use in library code.
+    #
+    # TODO: should we put in some controls to ensure that library
+    # config always gets applied before application config?
     if @registered_files.include?(filepath)
       raise "You've already registered #{filepath}."
     end
@@ -102,13 +101,17 @@ class Chalk::Config
       raise
     end
 
-    register_raw(config, filepath, options)
+    register_parsed(config, filepath, options)
+  end
+
+  def register_raw(config)
+    register_parsed(config, nil, {})
   end
 
   private
 
   # Register some raw config
-  def register_raw(config, filepath, options)
+  def register_parsed(config, filepath, options)
     allow_configatron_changes do
       directive = {
         config: config,

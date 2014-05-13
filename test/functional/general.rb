@@ -28,14 +28,15 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     assert_equal('value2', configatron.config2)
   end
 
-  describe 'runtime_config' do
-    it 'translates provided config to a runtime_config' do
-      Chalk::Config.runtime_config = {foo: 'bar'}
-      assert_equal('bar', configatron.runtime_config.foo)
+  describe 'register_raw' do
+    it 'merges in registered config' do
+      Chalk::Config.register_raw(foo: 'bar', config1: 'hi')
+      assert_equal('bar', configatron.foo)
+      assert_equal('hi', configatron.config1)
     end
 
     it 'environment validation continues to succeed' do
-      Chalk::Config.runtime_config = {foo: 'bar'}
+      Chalk::Config.register_raw(foo: 'bar')
       Chalk::Config.required_environments = ['default']
     end
   end
