@@ -89,10 +89,6 @@ class Chalk::Config
     #
     # TODO: should we put in some controls to ensure that library
     # config always gets applied before application config?
-    if relative_to = options[:relative_to]
-      filepath = File.expand_path(filepath, File.join(relative_to, '..'))
-    end
-
     if @registered_files.include?(filepath)
       raise "You've already registered #{filepath}."
     end
