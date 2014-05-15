@@ -88,10 +88,6 @@ class Chalk::Config
   end
 
   def register(filepath, options)
-    # Expand relative paths. This is for use in library code.
-    #
-    # TODO: should we put in some controls to ensure that library
-    # config always gets applied before application config?
     if @registered_files.include?(filepath)
       raise "You've already registered #{filepath}."
     end
