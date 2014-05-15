@@ -44,6 +44,9 @@ class Chalk::Config
 
   # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
   def self.register(filepath, options={})
+    unless filepath.start_with?('/')
+      raise ArgumentError.new("Register only accepts absolute paths, not #{filepath.inspect}. (This ensures that config is always correctly loaded rather than depending on your current directory. To avoid this error in the future, you may want to use a wrapper that expands paths based on a base directory.)")
+    end
     instance.register(filepath, options)
   end
 
