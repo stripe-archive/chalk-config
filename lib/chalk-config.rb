@@ -15,44 +15,112 @@ if defined?(Configatron::Store::SYCK_CONSTANT)
   Configatron::Store.send(:remove_const, 'SYCK_CONSTANT')
 end
 
-# When a file is registered, we load the file and cache that.
-# Separately maintain the merged version.
-# When environment changes, we use the cached file.
-
+# The main class powering Chalk's configuration.
+#
+# This is written using a wrapped Singleton, which makes testing
+# possible (just stub `Chalk::Config.instance` to return a fresh
+# instance) and helps hide implementation.
 class Chalk::Config
   include Singleton
 
+  # Thrown if an environment is missing from a config file.
   class MissingEnvironment < StandardError; end
 
-  ## Class methods here serve as the public-interface
-
+  # Sets the current environment. All configuration is then reapplied
+  # in the order it was {.register}ed. This means you don't have to
+  # worry about setting your environment prior to registering config
+  # files.
+  #
+  # @return [String] The current environment.
   def self.environment=(name)
-    instance.environment = name
+    instance.send(:environment=, name)
   end
 
+  # @return [String] The current environment (default: `'default'`)
   def self.environment
-    instance.environment
+    instance.send(:environment)
   end
 
+  # Specify the list of environments every configuration file must
+  # include.
+  #
+  # It's generally recommended to set this in a wrapper library, and
+  # use that wrapper library in all your projects. This way you can be
+  # defensive, and have certainty no config file slips through without
+  # the requisite environment keys.
+  #
+  # @param environments [Enumerable<String>] The list of required environments.
   def self.required_environments=(environments)
-    instance.required_environments = environments
+    instance.send(:required_environments=, environments)
   end
 
+  # Access the environments registered by {.required_environments=}.
+  #
+  # @return [Enumerable] The registered environments list (by default, nil)
   def self.required_environments
-    instance.required_environments
+    instance.send(:required_environments)
   end
 
-  # Loads, interprets, and caches the given YAML file, afterwards reconfiguring.
+  # Register a given YAML file to be included in the global
+  # configuration.
+  #
+  # The config will be loaded once (cached in memory) and be
+  # immediately deep-merged onto configatron. If you later run
+  # {.environment=}, then all registered configs will be reapplied in
+  # the order they were loaded.
+  #
+  # So for example, running
+  # `Chalk::Config.register('/path/to/config.yaml')` for a file with
+  # contents:
+  #
+  # ```yaml
+  # env1:
+  #   key1: value1
+  #   key2: value2
+  # ```
+  #
+  # would yield `configatron.env1.key1 == value1`,
+  # `configatron.env1.key2 == value2`. Later registering a file with
+  # contents:
+  #
+  # ```yaml
+  # env1:
+  #   key1: value3
+  # ```
+  #
+  # would yield `configatron.env1.key1 == value3`,
+  # `configatron.env1.key2 == value2`.
+  #
+  # @param filepath [String] Absolute path to the config file
+  # @option filepath [Boolean] :optional If true, it's fine for the file to be missing, in which case this registration is discarded.
+  # @option filepath [Boolean] :raw If true, the file doesn't have environment keys and should be splatted onto configatron directly. Otherwise, grab just the config under the appropriate environment key.
+  # @option filepath [String] :nested What key to namespace all of this configuration under. (So `nested: 'foo'` would result in configuration available under `configatron.foo.*`.)
   def self.register(filepath, options={})
     unless filepath.start_with?('/')
       raise ArgumentError.new("Register only accepts absolute paths, not #{filepath.inspect}. (This ensures that config is always correctly loaded rather than depending on your current directory. To avoid this error in the future, you may want to use a wrapper that expands paths based on a base directory.)")
     end
-    instance.register(filepath, options)
+    instance.send(:register, filepath, options)
   end
 
+  # Register a given raw hash to be included in the global
+  # configuration.
+  #
+  # This allows you to specify arbitrary configuration at
+  # runtime. It's generally not recommended that you use this method
+  # unless your configuration really can't be encoded in config
+  # files. A common example is configuration from environment
+  # variables (which might be something like the name of your
+  # service).
+  #
+  # Like {.register}, if you later run {.environment=}, this
+  # configuration will be reapplied in the order it was registered.
+  #
+  # @param config [Hash] The raw configuration to be deep-merged into configatron.
   def self.register_raw(config)
-    instance.register_raw(config)
+    instance.send(:register_raw, config)
   end
+
+  private
 
   def initialize
     # List of registered configs, in the form:

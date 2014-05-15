@@ -1,83 +1,164 @@
 # Chalk::Config
 
-A configuration layer over configatron.
+Maps on-disk config files into a loaded global
+[configatron](https://github.com/markbates/configatron) instance,
+taking into account your current environment.
+
+`configatron` is used within many Chalk gems to control their
+behavior, and is also great for configuration within your application.
 
 ## Usage
 
+### Environment
+
+`Chalk::Config` relies on describing your environment as an opaque
+string (`production`, `qa`, etc). You can set it like so:
+
+```ruby
+Chalk::Config.environment = 'production'
+```
+
+At that point, the global `configatron` will be cleared and all
+registered config reapplied, meaning you don't have to worry about
+setting the environment prior to registering files.
+
+`environment` defaults to the value `'default'`.
+
 ### Registering config files
 
-It's easy to create YAML configuration files:
+You can call
 
-    # /top/secret/site.yaml
+```ruby
+Chalk::Config.register('/path/to/file')
+```
 
-    password: hunter2
+to register a YAML configuration file. You must provide an absolute
+path, in order to ensure you're not relying on the present working
+directory. The following is a pretty good idiom:
 
-    database:
-      secret: 53CR37
+```ruby
+Chalk::Config.register(File.expand_path('../config.yaml', __FILE__))
+```
 
-    logs: /secret/location
+By default, YAML configuration files should have a top-level key for
+each environment.
 
-    # cookies.yaml
+A good convention is to have most configuration in a dummy `default`
+environment and use YAML's native merging to keep your file somewhat
+DRY (WARNING: there exists at least one gem which changes Ruby's YAML
+parser in the presence of multiple merge operators on a single key, so
+be wary of two `<<` calls at once.) However, it's also fine to repeat
+yourself to make the file more human readable.
 
-    ingredients: 'A lot of sugar and butter'
-    instructions: 'Mix and bake'
+```yaml
+# /path/to/config.yaml
+
+default: &default
+  my_feature:
+    enable: true
+    shards: 2
+
+  my_service:
+    host: localhost
+    port: 2800
+
+production:
+  <<: *default
+  my_service:
+    host: appserver1
+	port: 2800
+
+  send_emails: true
+
+development:
+  <<: *default
+  send_emails: false
+```
+
+The configuration from the currently active environment will then be
+added to the global `configatron` when you register the file:
+
+```ruby
+Chalk::Config.register('/path/to/config.yaml')
+
+Chalk::Config.environment = 'production'
+configatron.my_service.host
+#=> 'appserver1'
+
+Chalk::Config.environment = 'development'
+configatron.my_service.host
+#=> 'localhost'
+```
+
+Keys present in multiple files will be deep merged:
+
+```yaml
+# /path/to/site.yaml
+
+production:
+  my_service:
+    host: otherappserver
+
+development: {}
+```
+
+```ruby
+Chalk::Config.register('/path/to/site.yaml')
+
+Chalk::Config.environment = 'production'
+configatron.my_service.host
+#=> 'otherappserver'
+configatron.my_service.port
+#=> 2800
+```
+
+You can explicitly nest a config file (only a single level of nesting
+is current supported) using the `:nested` option. You can also
+indicate a file has no environment keys and should be applied directly
+via `:raw`:
 
 
-The properties specified will then be added to the global
-configatron object when you register the file:
+```yaml
+# /path/to/cookies.yaml
 
-    > Chalk::Config.register('/top/secret/site.yaml')
-    > configatron.password
-    => "hunter2"
+tasty: yes
+```
 
-Nested properties also work as expected:
+```ruby
+Chalk::Config.register('/path/to/cookies.yaml', nested: 'cookies', raw: true)
+configatron.cookies.tasty
+#=> 'yes'
+```
 
-    > configatron.database.secret
-    => "53CR37"
+## Best practices
 
-You can also explicitly nest a config file:
+### Config keys for everything
 
-    > Chalk::Config.register('cookies.yaml', nested: 'cookies')
+Writing code that switches off the environment is usually indicative
+of the antipattern:
 
-    > configatron.cookies.ingredients
-    => "A lot of sugar and butter"
+```ruby
+# BAD!
+if Chalk::Config.environment == 'production'
+  email.send!
+else
+  puts email
+end
+```
 
-    > configatron.ingredients
-    =>
+Instead, you should create a fresh config key for all of these cases:
 
+```ruby
+if configatron.send_emails
+  email.send!
+else
+  puts email
+```
 
-### Setting overrides for different environments
+This means your code doesn't need to know anything about the set of
+environment names, making adding a new environment easy. As well, it's
+much easier to have fine-grained control and visibility over exactly
+how your application behaves.
 
-You can set overrides for configured properties based on environment name:
-
-    # years.yaml
-
-    year: 1984
-
-    __overrides:
-      production:
-        year: 2014
-
-      apocalyptic:
-        year: 2050
-
-If you then set `Chalk::Config.environment`, Config will override
-the default `'year'` property on the global configatron object:
-
-    > Chalk::Config.register('years.yaml')
-
-    > configatron.year
-    => 1984
-
-    > Chalk::Config.environment = 'production'
-    > configatron.year
-    => 2014
-
-    > Chalk::Config.environment = 'apocalyptic'
-    > configatron.year
-    => 2050
-
-    > Chalk::Config.environment = 'aquatic'
-    > configatron.year
-    => 1984
-
+It's totally fine (and expected) to have many config keys that are
+used only once.
