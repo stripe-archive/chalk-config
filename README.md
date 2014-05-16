@@ -153,6 +153,7 @@ if configatron.send_emails
   email.send!
 else
   puts email
+end
 ```
 
 This means your code doesn't need to know anything about the set of
