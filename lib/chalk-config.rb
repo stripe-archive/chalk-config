@@ -206,7 +206,12 @@ class Chalk::Config
   end
 
   def load!(filepath)
-    loaded = YAML.load_file(filepath)
+    begin
+      loaded = YAML.load_file(filepath)
+    rescue StandardError => e
+      e.message << " (while loading #{filepath})"
+      raise
+    end
     unless loaded.is_a?(Hash)
       raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
     end
