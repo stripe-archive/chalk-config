@@ -208,7 +208,10 @@ class Chalk::Config
   def load!(filepath)
     begin
       loaded = YAML.load_file(filepath)
-    rescue StandardError => e
+    rescue Psych::BadAlias => e
+      # Most YAML parse errors include the filepath
+      # already. Psych::BadAlias (raised by doing something like
+      # `foo: *bar` where `&bar` is undefined) does not.
       e.message << " (while loading #{filepath})"
       raise
     end
