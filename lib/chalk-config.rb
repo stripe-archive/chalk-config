@@ -206,7 +206,18 @@ class Chalk::Config
   end
 
   def load!(filepath)
-    loaded = YAML.load_file(filepath)
+    begin
+      loaded = YAML.load_file(filepath)
+    rescue Psych::BadAlias => e
+      # YAML parse-time errors include the filepath already, but
+      # load-time errors do not.
+      #
+      # Specifically, `Psych::BadAlias` (raised by doing something
+      # like `YAML.load('foo: *bar')`) does not:
+      # https://github.com/tenderlove/psych/issues/192
+      e.message << " (while loading #{filepath})"
+      raise
+    end
     unless loaded.is_a?(Hash)
       raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
     end
