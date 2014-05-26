@@ -103,6 +103,7 @@ development: {}
 ```
 
 ```ruby
+Chalk::Config.register('/path/to/config.yaml')
 Chalk::Config.register('/path/to/site.yaml')
 
 Chalk::Config.environment = 'production'
