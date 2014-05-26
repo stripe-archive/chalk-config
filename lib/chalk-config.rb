@@ -209,9 +209,12 @@ class Chalk::Config
     begin
       loaded = YAML.load_file(filepath)
     rescue Psych::BadAlias => e
-      # Most YAML parse errors include the filepath
-      # already. Psych::BadAlias (raised by doing something like
-      # `foo: *bar` where `&bar` is undefined) does not.
+      # YAML parse-time errors include the filepath already, but
+      # load-time errors do not.
+      #
+      # Specifically, `Psych::BadAlias` (raised by doing something
+      # like `YAML.load('foo: *bar')`) does not:
+      # https://github.com/tenderlove/psych/issues/192
       e.message << " (while loading #{filepath})"
       raise
     end
