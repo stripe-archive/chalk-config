@@ -34,6 +34,10 @@ class Chalk::Config
     instance.send(:environment=, name)
   end
 
+  # You should generally not take any action directly off this
+  # value. All codepath switches should be triggered off configuration
+  # keys, possibly with environment assertions to ensure safety.
+  #
   # @return [String] The current environment (default: `'default'`)
   def self.environment
     instance.send(:environment)
