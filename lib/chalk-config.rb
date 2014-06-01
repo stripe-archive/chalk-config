@@ -4,7 +4,7 @@ require 'chalk-config/version'
 require 'chalk-config/errors'
 
 require 'configatron/core'
-raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
+raise Chalk::Config::Error.new("Someone already loaded 'configatron'. You should always load 'configatron/core' instead.") if defined?(configatron)
 def configatron
   Configatron.instance
 end
@@ -131,7 +131,7 @@ class Chalk::Config
     environments = [environments] if environments.kind_of?(String)
     return if environments.include?(environment)
 
-    raise Chalk::Config::DisallowedEnviroment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
+    raise DisallowedEnviroment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
   end
 
   # Raises if the current environment is one of the blacklisted
@@ -143,7 +143,7 @@ class Chalk::Config
     environments = [environments] if environments.kind_of?(String)
     return unless environments.include?(environment)
 
-    raise Chalk::Config::DisallowedEnviroment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
+    raise DisallowedEnviroment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
   end
 
   private
@@ -183,7 +183,7 @@ class Chalk::Config
 
   def register(filepath, options)
     if @registered_files.include?(filepath)
-      raise "You've already registered #{filepath}."
+      raise Error.new("You've already registered #{filepath}.")
     end
     @registered_files << filepath
 
@@ -245,7 +245,7 @@ class Chalk::Config
       raise
     end
     unless loaded.is_a?(Hash)
-      raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
+      raise Error.new("YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash")
     end
     loaded
   end
