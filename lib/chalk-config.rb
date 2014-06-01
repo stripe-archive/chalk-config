@@ -1,6 +1,7 @@
 require 'set'
 require 'yaml'
 require 'chalk-config/version'
+require 'chalk-config/errors'
 
 require 'configatron/core'
 raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
@@ -22,9 +23,6 @@ end
 # instance) and helps hide implementation.
 class Chalk::Config
   include Singleton
-
-  # Thrown if an environment is missing from a config file.
-  class MissingEnvironment < StandardError; end
 
   # Sets the current environment. All configuration is then reapplied
   # in the order it was {.register}ed. This means you don't have to
@@ -118,6 +116,30 @@ class Chalk::Config
   # @param config [Hash] The raw configuration to be deep-merged into configatron.
   def self.register_raw(config)
     instance.send(:register_raw, config)
+  end
+
+  # Raises if the current environment is not one of the whitelisted
+  # environments provided.
+  #
+  # Generally useful if you have a dev-only codepath you want to be
+  # *sure* never activates in production.
+  def self.assert_environment(environments)
+    environments = [environments] if environments.kind_of?(String)
+    return if environments.include?(environment)
+
+    raise Chalk::Config::DisallowedEnviroment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
+  end
+
+  # Raises if the current environment is one of the blacklisted
+  # environments provided.
+  #
+  # Generally useful if you have a dev-only codepath you want to be
+  # *sure* never activates in production.
+  def self.assert_not_environment(environments)
+    environments = [environments] if environments.kind_of?(String)
+    return unless environments.include?(environment)
+
+    raise Chalk::Config::DisallowedEnviroment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
   end
 
   private
