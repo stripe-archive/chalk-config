@@ -10,8 +10,7 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     # calls reset.
     Configatron.strict = true
 
-    config = Chalk::Config.send(:new)
-    Chalk::Config.stubs(instance: config)
+    fresh_chalk_config
 
     Chalk::Config.environment = 'testing'
     Chalk::Config.register(File.expand_path('../general/config.yaml', __FILE__))

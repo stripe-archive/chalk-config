@@ -1,9 +1,10 @@
 require 'set'
 require 'yaml'
 require 'chalk-config/version'
+require 'chalk-config/errors'
 
 require 'configatron/core'
-raise "Someone already loaded 'configatron'. You should always load 'configatron/core' instead." if defined?(configatron)
+raise Chalk::Config::Error.new("Someone already loaded 'configatron'. You should always load 'configatron/core' instead.") if defined?(configatron)
 def configatron
   Configatron.instance
 end
@@ -23,9 +24,6 @@ end
 class Chalk::Config
   include Singleton
 
-  # Thrown if an environment is missing from a config file.
-  class MissingEnvironment < StandardError; end
-
   # Sets the current environment. All configuration is then reapplied
   # in the order it was {.register}ed. This means you don't have to
   # worry about setting your environment prior to registering config
@@ -36,6 +34,10 @@ class Chalk::Config
     instance.send(:environment=, name)
   end
 
+  # You should generally not take any action directly off this
+  # value. All codepath switches should be triggered off configuration
+  # keys, possibly with environment assertions to ensure safety.
+  #
   # @return [String] The current environment (default: `'default'`)
   def self.environment
     instance.send(:environment)
@@ -120,6 +122,30 @@ class Chalk::Config
     instance.send(:register_raw, config)
   end
 
+  # Raises if the current environment is not one of the whitelisted
+  # environments provided.
+  #
+  # Generally useful if you have a dev-only codepath you want to be
+  # *sure* never activates in production.
+  def self.assert_environment(environments)
+    environments = [environments] if environments.kind_of?(String)
+    return if environments.include?(environment)
+
+    raise DisallowedEnvironment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
+  end
+
+  # Raises if the current environment is one of the blacklisted
+  # environments provided.
+  #
+  # Generally useful if you have a dev-only codepath you want to be
+  # *sure* never activates in production.
+  def self.assert_not_environment(environments)
+    environments = [environments] if environments.kind_of?(String)
+    return unless environments.include?(environment)
+
+    raise DisallowedEnvironment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
+  end
+
   private
 
   def initialize
@@ -157,7 +183,7 @@ class Chalk::Config
 
   def register(filepath, options)
     if @registered_files.include?(filepath)
-      raise "You've already registered #{filepath}."
+      raise Error.new("You've already registered #{filepath}.")
     end
     @registered_files << filepath
 
@@ -219,7 +245,7 @@ class Chalk::Config
       raise
     end
     unless loaded.is_a?(Hash)
-      raise "YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash"
+      raise Error.new("YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash")
     end
     loaded
   end
