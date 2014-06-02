@@ -6,17 +6,17 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     fresh_chalk_config
   end
 
-  describe '.assert_enviroment' do
+  describe '.assert_environment' do
     it 'raises if the environment is not in the array' do
       Chalk::Config.environment = 'hello'
-      assert_raises(Chalk::Config::DisallowedEnviroment) do
+      assert_raises(Chalk::Config::DisallowedEnvironment) do
         Chalk::Config.assert_environment(%w{foo bar})
       end
     end
 
     it 'raises if the environment is not the string' do
       Chalk::Config.environment = 'hello'
-      assert_raises(Chalk::Config::DisallowedEnviroment) do
+      assert_raises(Chalk::Config::DisallowedEnvironment) do
         Chalk::Config.assert_environment('foo')
       end
     end
@@ -32,7 +32,7 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     end
   end
 
-  describe '.assert_not_enviroment' do
+  describe '.assert_not_environment' do
     it 'does not raise if the environment is not in the array' do
       Chalk::Config.environment = 'hello'
       Chalk::Config.assert_not_environment(%w{foo bar})
@@ -45,14 +45,14 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
 
     it 'raises if the environment is in the array' do
       Chalk::Config.environment = 'hello'
-      assert_raises(Chalk::Config::DisallowedEnviroment) do
+      assert_raises(Chalk::Config::DisallowedEnvironment) do
         Chalk::Config.assert_not_environment(%w{hello there})
       end
     end
 
     it 'raises if the environment is the string' do
       Chalk::Config.environment = 'hello'
-      assert_raises(Chalk::Config::DisallowedEnviroment) do
+      assert_raises(Chalk::Config::DisallowedEnvironment) do
         Chalk::Config.assert_not_environment('hello')
       end
     end

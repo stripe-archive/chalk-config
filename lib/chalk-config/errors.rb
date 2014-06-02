@@ -4,5 +4,5 @@ class Chalk::Config
   # Thrown if an environment is missing from a config file.
   class MissingEnvironment < Error; end
   # Thrown from environment assertions.
-  class DisallowedEnviroment < Error; end
+  class DisallowedEnvironment < Error; end
 end

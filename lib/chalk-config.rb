@@ -131,7 +131,7 @@ class Chalk::Config
     environments = [environments] if environments.kind_of?(String)
     return if environments.include?(environment)
 
-    raise DisallowedEnviroment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
+    raise DisallowedEnvironment.new("Current environment #{environment.inspect} is not one of the allowed environments #{environments.inspect}")
   end
 
   # Raises if the current environment is one of the blacklisted
@@ -143,7 +143,7 @@ class Chalk::Config
     environments = [environments] if environments.kind_of?(String)
     return unless environments.include?(environment)
 
-    raise DisallowedEnviroment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
+    raise DisallowedEnvironment.new("Current environment #{environment.inspect} is one of the disallowed environments #{environments.inspect}")
   end
 
   private
