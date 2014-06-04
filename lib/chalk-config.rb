@@ -285,10 +285,11 @@ class Chalk::Config
       choice = config
     end
 
+    subconfigatron = configatron
     if nested = directive[:options][:nested]
-      subconfigatron = configatron[nested]
-    else
-      subconfigatron = configatron
+      nested.split('.').each do |key|
+        subconfigatron = subconfigatron[key]
+      end
     end
 
     subconfigatron.configure_from_hash(choice)

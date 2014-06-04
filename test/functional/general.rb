@@ -74,6 +74,22 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     end
   end
 
+  describe 'nested config files' do
+    it 'nests' do
+      Chalk::Config.register(File.expand_path('../general/raw.yaml', __FILE__),
+        nested: 'nested',
+        raw: true)
+      assert_equal('there', configatron.nested.hi)
+    end
+
+    it 'deep-nests' do
+      Chalk::Config.register(File.expand_path('../general/raw.yaml', __FILE__),
+        nested: 'nested.deeply',
+        raw: true)
+      assert_equal('there', configatron.nested.deeply.hi)
+    end
+  end
+
   describe 'required_environments' do
     it 'raises if an existing config is missing an environment' do
       assert_raises(Chalk::Config::MissingEnvironment) do
