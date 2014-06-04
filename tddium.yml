@@ -1,0 +1,11 @@
+:tddium:
+  :ruby_version: ruby-1.9.3-p194
+  :bundler_version: 1.3.5
+  :test_pattern:
+    - "test/wholesome/[^_]*.rb"
+    - "test/unit/[^_]*.rb"
+    - "test/integration/[^_]*.rb"
+    - "test/functional/[^_]*.rb"
+  :boot_hook: >
+    /usr/bin/env sh -c "gem install --user-install --no-rdoc --no-ri github_api -v=0.10.1 && gem install --user-install --no-rdoc --no-ri --ignore-dependencies tddium_status_github -v=0.2.0 &&
+    echo '$:.concat(Dir.glob(File.join(Gem.user_dir, \"gems\", \"*\", \"lib\"))); require \"tddium_status_github\"' >> Rakefile"
