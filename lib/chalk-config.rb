@@ -94,9 +94,16 @@ class Chalk::Config
   # `configatron.env1.key2 == value2`.
   #
   # @param filepath [String] Absolute path to the config file
-  # @option filepath [Boolean] :optional If true, it's fine for the file to be missing, in which case this registration is discarded.
-  # @option filepath [Boolean] :raw If true, the file doesn't have environment keys and should be splatted onto configatron directly. Otherwise, grab just the config under the appropriate environment key.
-  # @option filepath [String] :nested What key to namespace all of this configuration under. (So `nested: 'foo'` would result in configuration available under `configatron.foo.*`.)
+  # @option options [Boolean] :optional If true, it's fine for the
+  #   file to be missing, in which case this registration is
+  #   discarded.
+  # @option options [Boolean] :raw If true, the file doesn't have
+  #  environment keys and should be splatted onto configatron
+  #  directly. Otherwise, grab just the config under the appropriate
+  #  environment key.
+  # @option options [String] :nested What key to namespace all of
+  #  this configuration under. (So `nested: 'foo'` would result in
+  #  configuration available under `configatron.foo.*`.)
   def self.register(filepath, options={})
     unless filepath.start_with?('/')
       raise ArgumentError.new("Register only accepts absolute paths, not #{filepath.inspect}. (This ensures that config is always correctly loaded rather than depending on your current directory. To avoid this error in the future, you may want to use a wrapper that expands paths based on a base directory.)")

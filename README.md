@@ -26,7 +26,8 @@ setting the environment prior to registering files.
 
 ### Registering config files
 
-You can call
+Additional configuration files are registered using
+{Chalk::Config.register}. The most basic usage looks like
 
 ```ruby
 Chalk::Config.register('/path/to/file')
