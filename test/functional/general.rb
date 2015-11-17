@@ -99,4 +99,55 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
       end
     end
   end
+
+  describe '.reload' do
+    before do
+      @tmpfile = Tempfile.new('config.yaml')
+      write_config(<<EOF)
+testing:
+  fruit: bananas
+EOF
+    end
+
+    after do
+      @tmpfile.unlink
+    end
+
+    def write_config(text)
+      File.open(@tmpfile.path, "w") do |fh|
+        fh.write(text)
+      end
+    end
+
+    it 'can reload config' do
+      Chalk::Config.register(@tmpfile.path)
+      assert_equal('bananas', configatron.fruit)
+      write_config(<<EOF)
+testing:
+  fruit: apples
+EOF
+      Chalk::Config.reload(@tmpfile.path)
+      assert_equal('apples', configatron.fruit)
+    end
+
+    it 'can reload an optional config that now exists' do
+      File.unlink(@tmpfile.path)
+      Chalk::Config.register(@tmpfile.path, optional: true)
+      write_config(<<EOF)
+testing:
+  fruit: apples
+EOF
+      Chalk::Config.reload(@tmpfile.path)
+      assert_equal('apples', configatron.fruit)
+    end
+
+    it 'fails safe if the file is invalid' do
+      Chalk::Config.register(@tmpfile.path)
+      write_config("{ this isn't yaml")
+      assert_raises(Psych::SyntaxError) do
+        Chalk::Config.reload(@tmpfile.path)
+      end
+      assert_equal('bananas', configatron.fruit)
+    end
+  end
 end

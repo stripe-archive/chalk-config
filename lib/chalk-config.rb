@@ -107,6 +107,19 @@ class Chalk::Config
     instance.send(:register, filepath, options)
   end
 
+  # Reload a single pre-registered configuration file from disk.
+  #
+  # {.register} must have already been called to register
+  # `filepath`. Re-reads `filepath` from disk, and updates
+  # configuration to reflect the new contents.
+  #
+  # In the event of any error (e.g. `filepath` has been deleted, or
+  # contains invalid YAML), this method will raise the underlying
+  # exception and leave configuration unmodified.
+  def self.reload(filepath)
+    instance.send(:reload, filepath)
+  end
+
   # Register a given raw hash to be included in the global
   # configuration.
   #
@@ -193,11 +206,31 @@ class Chalk::Config
     begin
       config = load!(filepath)
     rescue Errno::ENOENT
-      return if options[:optional]
-      raise
+      raise unless options[:optional]
     end
 
     register_parsed(config, filepath, options)
+  end
+
+  def reload(filepath)
+    registration = @registrations.find { |r| r[:filepath] == filepath }
+    unless registration
+      raise ArgumentError.new("`#{filepath}' was not registered.")
+    end
+
+    begin
+      config = load!(filepath)
+    rescue Errno::ENOENT
+      raise unless options[:optional]
+    end
+
+    validate_config(registration.merge(config: config))
+
+    registration[:config] = config
+
+    allow_configatron_changes do
+      reapply_config
+    end
   end
 
   def register_raw(config)
@@ -256,6 +289,8 @@ class Chalk::Config
   # Take a hash and mix in the environment-appropriate key to an
   # existing configatron object.
   def mixin_config(directive)
+    return if directive[:options][:optional] && directive[:config].nil?
+
     raw = directive[:options][:raw]
 
     config = directive[:config]
@@ -292,6 +327,8 @@ class Chalk::Config
   end
 
   def validate_config(directive)
+    return if directive[:config].nil? && directive[:options][:optional]
+
     (@required_environments || []).each do |environment|
       raw = directive[:options][:raw]
 
