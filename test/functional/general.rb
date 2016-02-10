@@ -53,8 +53,9 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
 
   describe 'empty yaml file' do
     it 'Emits a warning when optional = true' do
-      assert_output(stdout = "WARN: YAML.load(\"/Users/areitz/stripe/chalk-config/test/functional/general/empty.yaml\") parses false, which indicates that the file is empty. Continuing.\n") do
-        Chalk::Config.register(File.expand_path('../general/empty.yaml', __FILE__), optional: true)
+      file_path = File.expand_path('../general/empty.yaml', __FILE__)
+      assert_output(stdout = "WARN: YAML.load(\"#{file_path}\") parses false, which indicates that the file is empty. Continuing.\n") do
+        Chalk::Config.register(file_path, optional: true)
       end
     end
 
