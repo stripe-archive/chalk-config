@@ -51,6 +51,21 @@ class Critic::Functional::GeneralTest < Critic::Functional::Test
     end
   end
 
+  describe 'empty yaml file' do
+    it 'Emits a warning when optional = true' do
+      file_path = File.expand_path('../general/empty.yaml', __FILE__)
+      assert_output(stdout = "WARN: YAML.load(\"#{file_path}\") parses false, which indicates that the file is empty. Continuing.\n") do
+        Chalk::Config.register(file_path, optional: true)
+      end
+    end
+
+    it 'raises an exception when optional = false' do
+      assert_raises(Chalk::Config::EmptyYamlFileError) do
+        Chalk::Config.register(File.expand_path('../general/empty.yaml', __FILE__), optional: false)
+      end
+    end
+  end
+
   describe 'missing nested files' do
     it 'does not create the relevant config key' do
       Chalk::Config.register(File.expand_path('../general/nonexistent.yaml', __FILE__),

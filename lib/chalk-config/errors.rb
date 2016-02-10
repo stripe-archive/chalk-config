@@ -5,4 +5,6 @@ class Chalk::Config
   class MissingEnvironment < Error; end
   # Thrown from environment assertions.
   class DisallowedEnvironment < Error; end
+  # Thrown if a YAML file parses empty (mixture of empty lines and comments)
+  class EmptyYamlFileError < Error; end
 end
