@@ -289,7 +289,7 @@ class Chalk::Config
     end
     if loaded.is_a?(FalseClass)
       raise EmptyYamlFileError.new("YAML.load(#{filepath.inspect}) parses false, which indicates that the file is empty.")
-    elsif loaded.is_a?(Hash)
+    elsif not loaded.is_a?(Hash)
       raise Error.new("YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash")
     end
     loaded
