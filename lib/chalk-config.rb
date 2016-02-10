@@ -207,6 +207,13 @@ class Chalk::Config
       config = load!(filepath)
     rescue Errno::ENOENT
       raise unless options[:optional]
+    rescue EmptyYamlFileError => e
+      if options[:optional]
+        puts "WARN: #{e.message} Continuing."
+        config = nil
+      else
+        raise e
+      end
     end
 
     register_parsed(config, filepath, options)
@@ -280,7 +287,9 @@ class Chalk::Config
       e.message << " (while loading #{filepath})"
       raise
     end
-    unless loaded.is_a?(Hash)
+    if loaded.is_a?(FalseClass)
+      raise EmptyYamlFileError.new("YAML.load(#{filepath.inspect}) parses false, which indicates that the file is empty.")
+    elsif loaded.is_a?(Hash)
       raise Error.new("YAML.load(#{filepath.inspect}) parses into a #{loaded.class}, not a Hash")
     end
     loaded
