@@ -1,4 +1,7 @@
 # Chalk::Config
+# DEPRECATED: Stripe no longer support Chalk::Config
+
+## Description 
 
 Maps on-disk config files into a loaded global
 [configatron](https://github.com/markbates/configatron) instance,
